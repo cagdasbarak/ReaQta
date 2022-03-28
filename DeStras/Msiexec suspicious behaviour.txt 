@@ -1,0 +1,24 @@
+title = 'Msiexec suspicious behaviour'
+notes = 'The detection will notity every time a suspicious msiexec.exe is executed'
+impact = 89
+tags = {"msiexec", "evasion"}
+
+regex = "((?=.*\\/quiet\\b)|(?=.*\\/q\\b))(?=.*\\/i\\b).+(https?)"
+
+if event.is_process_created() then
+    logger("msiexec check")
+    logger("Proc name " .. event.process.get_ofn())
+    logger("Integrity  " .. event.process.privilegeLevel)
+    if event.process.get_ofn() == "msiexec.exe" and event.process.privilegeLevel ~= "SYSTEM" then
+        logger("Matched msiexec")
+        if regex_match(regex, event.process.get_cmd_line()) then
+            logger("Regex msiexec matched")
+            stored = event
+        end 
+    elseif event.process.get_parent_ofn() == "msiexec.exe" and event.parentProcess.privilegeLevel == "SYSTEM"  and stored then
+        logger("Matched child")        
+        create_alert({stored, event}, title, impact, notes, tags)
+    end
+elseif event.is_process_terminated() and stored and event.process.pid == store.process.pid then
+   stored = nil
+end

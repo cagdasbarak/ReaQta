@@ -1,0 +1,23 @@
+-- Title: Ransomware behaviour - Terminate Parent Process
+-- OS: Windows
+-- Event: Process Created
+
+
+title = "Ransomware behaviour"
+notes = "A parent process is trying to delete the shadow copy, often used by ransomware to make files unrecoverable."
+impact = 100
+tags = {"ransomware", "shadow", "delete"}
+
+local function notify_user(event)
+    msg ="Suspicious " .. event.process.get_ofn() .. " has been blocked. Please contact your administrator if you required this application for your work."
+    msg_box(msg)
+end
+
+if (event.process.get_ofn() == "vssadmin.exe" or event.process.get_ofn() == "wmic.exe")
+    and event.process.get_cmd_line():lower():find("delete")
+    and event.process.get_cmd_line():lower():find("shadow")
+then
+    create_alert({event}, title, impact, notes, tags)
+    notify_user(event)
+    if event.parentProcess then kill_process(event.parentProcess.pid, event.parentProcess.startTime) end
+end

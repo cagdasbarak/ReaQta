@@ -1,0 +1,13 @@
+-- Squiblydoo Attack
+-- Compatible OS: windows
+-- Binding Events:
+-- Process Create
+
+title = "Squiblydoo Attack Detected"
+notes = ""
+impact = 100
+tags = {"squiblydoo", "evasive"}
+
+if event.process.get_ofn() == "regsvr32.exe" and string.find(string.lower(event.process.get_cmd_line()), "scrobj.dll")  then
+    create_alert({event}, title, impact, notes, tags)
+end

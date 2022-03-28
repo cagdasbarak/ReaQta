@@ -1,0 +1,273 @@
+------------------ User Account Deleted ---------------------
+
+------------------ DO NOT CHANGE THE CODE BELOW ---------------------
+
+if not event.is_account_user_deleted() then return end
+
+title = "User " .. event.data.etwSubjectUserName .. " deleted an account " .. event.data.etwTargetUserName
+notes = title
+impact = 100
+tags = {"hive-jsol-output"}
+
+create_alert({event}, title, impact, notes, tags)
+
+------------------ User Account Deleted ---------------------
+
+
+------------------ New User Account Created ---------------------
+
+------------------ DO NOT CHANGE THE CODE BELOW ---------------------
+
+if not event.is_account_user_created() then return end
+
+title = "User " .. event.data.etwSubjectUserName .. " created a new account " .. event.data.etwTargetUserName
+notes = title
+impact = 100
+tags = {"hive-jsol-output"}
+
+create_alert({event}, title, impact, notes, tags)
+
+------------------ New User Account Created ---------------------
+
+
+------------------ Monitor User Added to Security-Enabled Local Group ---------------------
+
+-- Monitor user added to security-enabled local group
+--
+-- This policy will notify every time a user will be added to a security-enabled local group that will match the monitored ones.
+-- Set to false to have an alert for every security-enabled local group not filtered by the monitored_groups
+--
+-- Configuration parameters:
+--              monitor : enabled the filtering on the monitored groups. Set to False to notify everytime
+--              monitored_groups : array with monitored groups
+--      
+--
+-- Adjust the variables accordingly
+
+if __engine_version < 2 then return end
+
+monitor = true
+
+monitored_groups = {
+    "Administrators",
+}
+
+------------------ DO NOT CHANGE THE CODE BELOW ---------------------
+if not event.is_etw_security_auditing() then return end
+if event.data.etwEventId ~= 4732 then return end
+
+local function notify(event)
+    title = "User " .. event.data.etwData.etwSubjectUserName .. " has been added to " .. event.data.etwData.etwTargetUserName .. " group"
+    notes = title
+    impact = 100
+    tags = {"hive-jsol-output"}
+    logger(title)
+    create_alert({event}, title, impact, notes, tags)
+end
+
+if not monitor then
+    notify(event)
+end
+
+for _, group in ipairs(monitored_groups) do
+    if event.data.etwData.etwTargetUserName:lower():find(group:lower()) then
+        notify(event)
+        return
+    end
+end
+
+------------------ Monitor User Added to Security-Enabled Local Group ---------------------
+
+
+
+------------------ User Account Management ---------------------
+
+-- User account management
+--
+-- This policy will notify every time an account is modified
+-- More info from microsoft documentation: 
+--  https://docs.microsoft.com/en-us/windows/security/threat-protection/auditing/audit-user-account-management
+-- 
+-- No parameters needed for this Detection Strategy
+
+--------------------------------------------------------------------------------------
+
+------------------ DO NOT CHANGE THE CODE BELOW ---------------------
+
+if __engine_version < 2 then return end
+
+local function Set (list)
+    local set = {}
+    for _, l in ipairs(list) do set[l] = true end
+    return set
+end
+
+local items = Set { 
+    4797, 
+    4798,
+   -- 5379,
+}
+
+local function notify(event)
+    title = event.data.etwEventId .. " - " .. event.data.etwEventDescription
+    notes = title
+    impact = 100
+    tags = {"hive-jsol-output"}
+    create_alert({event}, title, impact, notes, tags)
+end
+
+local function exlude_ids(event)
+    if items[event.data.etwEventId] then
+        return true
+    else
+        return false
+    end 
+end
+
+if event.data.etwTask == 13824 and not exlude_ids(event) then
+    notify(event)
+end
+
+------------------ User Account Management ---------------------
+
+
+------------------ Account Logon outside working hours V2 ---------------------
+
+-- Account Logon outside working hours V2
+--
+-- This policy will notify every time an account logs in outside the defined working hours
+--
+-- Working times are defined by:
+--      start_time : business opening time defined as HH:mm::ss 24h format ("07:30:00")
+--      end_time :  business closing time defined as HH:mm::ss 24h format ("18:00:00")
+--      utc : set to true if the specified times are in UTC and not locale
+--      exclude_days :  set to true the day you want exclude from ALLOWED working days:
+--                      By default selected: Saturday, Sunday.
+--      holidays : set the holidays here in the format: YYYY-MM-DD as string surrounded by "" and separated by comma:
+--                  example: "2020-03-09"
+--
+-- Adjust the variables accordingly
+-- The timezone is the local time
+
+--------------------------------------------------------------------------------------
+utc = false
+
+start_time = "07:30:00"
+end_time = "13:00:00"
+
+exclude_days = {
+    [0] = true, -- Sunday
+    [1] = false, -- Monday
+    [2] = false, -- Tuesday
+    [3] = false, -- Wednesday
+    [4] = false, -- Thursday
+    [5] = false, -- Friday
+    [6] = true -- Saturday
+}
+
+holidays = {}
+
+------------------ DO NOT CHANGE THE CODE BELOW ---------------------
+
+if __engine_version < 2 then
+    return
+end
+
+local function check_holidays(time_parsed)
+    for _, holiday in ipairs(holidays) do
+        _, _, y, m, d = string.find(holiday, "(%d+)-(%d+)-(%d+)")
+        if tonumber(y) == time_parsed.year and tonumber(m) == time_parsed.month and tonumber(d) == time_parsed.day then
+            return true
+        end
+    end
+    return false
+end
+
+local function check_interactive_login(event)
+    if
+        (event.data.etwLogonType == 2 or event.data.etwLogonType == 7 or event.data.etwLogonType == 10) and
+            event.data.etwAuthenticationPackageName:lower():find("negotiate") and
+            event.data.etwLogonProcessName:lower():find("user32")
+     then
+        return true
+    end
+    return false
+end
+
+local function notify(event)
+    title =
+        "Account " ..
+        event.data.etwTargetUserName ..
+            " logged on " .. event.data.etwWorkstationName .. " outside working hours at " .. event.data.etwTimeCreated
+    notes = title
+    impact = 100
+    tags = {"hive-jsol-output"}
+    create_alert({event}, title, impact, notes, tags)
+end
+
+if not event.is_account_logged_on() or not check_interactive_login(event) then
+    return
+end
+
+tp = parse_time(event.data.etwTimeCreated, not utc)
+found = exclude_days[tp.dayOfWeek]
+outside = in_time_ranges(event.data.etwTimeCreated, start_time, end_time, utc)
+if outside == 0 and not found and not check_holidays(tp) then
+    return
+end
+
+notify(event)
+
+------------------ Account Logon outside working hours V2 ---------------------
+
+
+------------------ Multiple login failed attempts ---------------------
+
+-- Multiple login failed attempts
+--
+-- This policy will notify every time an account will fails to login multiple times within the predefined time interval
+--
+-- Configuration parameters:
+--      attempts :              Number of attempts before triggering and incident
+--      time_span_millis :     Time span between the attempts could happen. Definied in milliseconds.
+--
+-- Adjust the variables accordingly
+-- The timezone is the local time
+
+attempts = 5
+time_span_millis = 1*60*60*1000 -- 1 hour
+
+------------------ DO NOT CHANGE THE CODE BELOW ---------------------
+local function check_interactive_login(event)
+    if (event.data.etwLogonType == 2 or event.data.etwLogonType == 3 or event.data.etwLogonType == 7 or event.data.etwLogonType == 10)
+    --and event.data.etwAuthenticationPackageName:lower():find("negotiate")
+    --and event.data.etwLogonProcessName:lower():find("user32") 
+    then
+        return true
+    end
+    return false
+end
+
+local function notify(event)
+    title = "Account " .. event.data.etwTargetUserName .. " failed to login on ".. event.data.etwWorkstationName .. " over " .. attempts .. " times"
+    notes = title
+    impact = 100
+    tags = {"hive-jsol-output"}
+    create_alert({event}, title, impact, notes, tags)
+end
+
+if not event.is_account_log_on_failed() 
+or not check_interactive_login(event)
+then 
+    return
+end
+
+if tbox == nil then
+    tbox = timebox.new(attempts, time_span_millis)
+end
+
+if tbox:count() then
+    notify(event)
+end
+
+------------------ Multiple login failed attempts ---------------------

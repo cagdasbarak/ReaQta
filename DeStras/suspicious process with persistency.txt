@@ -1,0 +1,20 @@
+--Destra Title: Executable and Parent in User or Temp Directory and create persistency
+--Destra Description: This behaviour is suspicious as the executable created persistency and both parent and itself is running from a User or Temp directory
+--Events: Registry Persistency
+--Platform: Windows
+
+title = "suspicous process with persistency"
+notes = "Suspicious behaviour where executable and parent process is running from User or Temp Directory. Executable is creating persistency."
+impact = 65
+tags = {"persistency", "suspicious"}
+
+if event.parentProcess.program.path ~= nil
+	and (event.process.in_user_dir() or event.process.in_temp_dir())
+	and (event.process.parent_in_user_dir() or event.process.parent_in_temp_dir())
+	and event.process.program.certInfo.found == false
+	and event.parentProcess.program.certInfo.found == false
+	then
+	create_alert({event}, title, impact, notes, tags)
+	logger(event.parentProcess.program.path)
+	logger(event.process.get_path())
+end

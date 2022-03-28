@@ -1,0 +1,76 @@
+DeStra
+Windows: Process create, terminate or executable dropped
+Linux: Process create, terminate
+
+?withPowers=true
+?advanced=true
+
+--------------------------------
+
+title = "Linux - Cat/copy /etc/passwd"
+notes = "The detection strategy will match every time someone attempts to read or copy /etc/passwd"
+impact = 100
+tags = {"execution", "monitoring", "exfiltration", "copy"}
+
+if (event.process.get_ofn() == "cp" or event.process.get_ofn() == "cat")  and event.data.cmdLine:find("passwd", nil, true) then
+    create_alert({event}, title, impact, notes, tags)
+end
+
+--------------------------------
+
+title = "Linux - useradd, adduser or userdel run to add or delete user account"
+notes = "The detection strategy will match every time useradd or userdel is run to add or delete user account"
+impact = 70
+tags = {"execution", "persistency", "accounts"}
+
+if (event.process.get_ofn() == "useradd" or event.process.get_ofn() == "adduser" or event.process.get_ofn() == "userdel")  and (string.len(event.data.cmdLine) > 9) then
+    title = event.data.cmdLine .. " executed"
+    create_alert({event}, title, impact, notes, tags)
+end
+
+--------------------------------
+
+title = "Linux - iptables run"
+notes = "The detection strategy will match every time iptables run with append of insert parameters"
+impact = 70
+tags = {"execution", "persistency", "firewall"}
+
+if (event.process.get_ofn() == "iptables") and (event.data.cmdLine:find("-A", nil, true) or event.data.cmdLine:find("-I", nil, true) or event.data.cmdLine:find("--append", nil, true) or event.data.cmdLine:find("--insert", nil, true)) then
+    title = event.data.cmdLine .. " executed"
+    create_alert({event}, title, impact, notes, tags)
+end
+
+--------------------------------
+
+title = "Linux - ufw run"
+notes = "The detection strategy will match every time ufw run with append of insert parameters"
+impact = 70
+tags = {"execution", "persistency", "firewall"}
+
+if (event.process.get_ofn() == "ufw") and (event.data.cmdLine:find("insert", nil, true) or event.data.cmdLine:find("allow", nil, true)) then
+    title = event.data.cmdLine .. " executed"
+    create_alert({event}, title, impact, notes, tags)
+end
+
+--------------------------------
+
+title = "Linux - killall run"
+notes = "The detection strategy will match every time killall is run"
+impact = 70
+tags = {"execution", "terminate_process"}
+
+if (event.process.get_ofn() == "killall") and (string.len(event.data.cmdLine) > 8) then
+    title = event.data.cmdLine .. " executed"
+    create_alert({event}, title, impact, notes, tags)
+end
+
+--------------------------------
+
+title = "Linux - service start/stop run"
+notes = "The detection strategy will match every time service start/stop is run"
+impact = 70
+tags = {"execution", "services"}
+
+if (event.process.get_ofn() == "service") and (event.data.cmdLine:find("start", nil, true) or event.data.cmdLine:find("stop", nil, true)) then
+    title = event.data.cmdLine .. " executed"
+    create_alert({event}, title, impact, notes, tags)

@@ -1,0 +1,50 @@
+-- Multiple login failed attempts
+--
+-- This policy will notify every time an account will fails to login multiple times within the predefined time interval
+-- Title: Account Logon Failed > 3 times
+-- Event: Account Logged On Failed
+-- OS: Windows
+--
+-- Configuration parameters:
+--      attempts : Number of attempts before triggering and incident
+--      time_span_millis : Time span between the attempts could happen. Definied in milliseconds.
+--
+-- Adjust the variables accordingly
+-- The timezone is the local time
+
+
+attempts = 3
+time_span_millis = 1*60*60*1000 -- 1 hour
+
+------------------ DO NOT CHANGE THE CODE BELOW ---------------------
+local function check_interactive_login(event)
+    if (event.data.etwLogonType == 2 or event.data.etwLogonType == 3 or event.data.etwLogonType == 7 or event.data.etwLogonType == 10)
+    --and event.data.etwAuthenticationPackageName:lower():find("negotiate")
+    --and event.data.etwLogonProcessName:lower():find("user32") 
+    then
+        return true
+    end
+    return false
+end
+
+local function notify(event)
+    title = "Account " .. event.data.etwTargetUserName .. " failed to login on ".. event.data.etwWorkstationName .. " over " .. attempts .. " times"
+    notes = title
+    impact = 100
+    tags = {"bruteforce"}
+    create_alert({event}, title, impact, notes, tags)
+end
+
+if not event.is_account_log_on_failed() 
+or not check_interactive_login(event)
+then 
+    return
+end
+
+if tbox == nil then
+    tbox = timebox.new(attempts, time_span_millis)
+end
+
+if tbox:count() then
+    notify(event)
+end

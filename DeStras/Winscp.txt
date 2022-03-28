@@ -1,0 +1,12 @@
+Windows: Process create
+
+--------------------------------
+
+title = "Winscp Run"
+notes = "The detection strategy will match every time winscp runs"
+impact = 20
+tags = {"execution", "exfiltration", "copy"}
+
+if (event.process.get_ofn() == "winscp.exe")  then
+    create_alert({event}, title, impact, notes, tags)
+end

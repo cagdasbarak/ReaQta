@@ -1,0 +1,15 @@
+-- Binding event: Process Created
+-- OS: windows
+
+title = "Scheduled task running process from temp or user directory"
+notes = "Suspicious scheduled task created by: "
+impact = 90
+tags = {"persistency", "code execution"}
+
+if event.process.get_ofn() == "schtasks.exe"
+and (event.process.get_cmd_line():lower():find("\temp") 
+or event.process.get_cmd_line():lower():find("\appdata")) then
+	notes = notes .. string.format("%s",
+	event.process.get_parent_fs_name())
+	create_alert({event}, title, impact, notes, tags)
+end

@@ -1,0 +1,24 @@
+--Destra Title: Suspicious App starting browser
+--Destra Description: This behaviour is suspicious as the executable starts a browser to potentially make connection
+--Events: Process created
+--Platform: Windows
+
+title = "Suspicious App starting browser"
+notes = "This behaviour is suspicious as the executable starts a browser to potentially make connection"
+impact = 65
+tags = {"starts_browser", "suspicious"}
+
+if event.process.get_ofn() == "iexplore.exe"
+   or event.process.get_ofn() == "chrome.exe"
+   or event.process.get_ofn() == "firefox.exe"
+   or event.process.get_ofn() == "opera.exe"
+   then
+	if event.parentProcess.program.path ~= nil
+		and (event.process.parent_in_user_dir() or event.process.parent_in_temp_dir())
+		and event.parentProcess.program.certInfo.found == false
+		then
+		create_alert({event}, title, impact, notes, tags)
+		logger(event.parentProcess.program.path)
+		logger(event.process.get_path())
+	end
+end
